@@ -6,10 +6,10 @@ dotenv.config();
 // Configuración de conexión para Producción
 // Se usan variables de entorno, o valores por defecto para el servidor de producción
 const config = {
-  user: process.env.DB_USER,
+  user: process.env.DB_USER || 'ane_user',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'ane_db',
+  password: process.env.DB_PASSWORD || 'ane_password',
   port: parseInt(process.env.DB_PORT || '5432'),
 };
 

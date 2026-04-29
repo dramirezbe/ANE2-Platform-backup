@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useMemo, useState } from 'react';
 import Plotly from 'plotly.js-dist-min';
 
 const WATERFALL_POWER_LABEL = 'units';
-const WATERFALL_MIN_POWER = -70;
+const WATERFALL_MIN_POWER = -80;
 const WATERFALL_MAX_POWER = 5;
 
 interface WaterfallProps {
@@ -178,12 +178,15 @@ export const Waterfall = memo(function Waterfall({ history, freqUnit = 'MHz', mi
 
     const powerRange = Math.max(WATERFALL_MAX_POWER - WATERFALL_MIN_POWER, 1e-9);
 
-    // Fixed normalization: -70 -> 0% and 0 -> 100%, clamped outside the range.
+    // Non-linear normalization using square root: amplifies detail in low power range
+    // The 0.5 exponent makes -80 to -30 dBm use ~75% of the color range
     const normalizedZData = zData.map(row =>
       row.map(value => {
         if (!Number.isFinite(value)) return Number.NaN;
-        const normalized = ((value - WATERFALL_MIN_POWER) / powerRange) * 100;
-        return Math.max(0, Math.min(100, normalized));
+        
+        const linear = Math.max(0, Math.min(1, (value - WATERFALL_MIN_POWER) / powerRange));
+        // The 0.5 exponent (square root) amplifies lower values where most signals are
+        return Math.pow(linear, 0.5) * 100;
       })
     );
 
@@ -224,6 +227,8 @@ export const Waterfall = memo(function Waterfall({ history, freqUnit = 'MHz', mi
           title: { text: `${WATERFALL_POWER_LABEL} / %`, side: 'right', font: { size: 11 } },
           thickness: 15,
           len: 0.9,
+          x: 1.02,
+          xanchor: 'left',
           tickvals: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
           ticktext: ['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'],
         },
@@ -232,7 +237,7 @@ export const Waterfall = memo(function Waterfall({ history, freqUnit = 'MHz', mi
     ];
 
     const layout: Partial<Plotly.Layout> = {
-      margin: { t: 10, r: showColorbar ? 80 : 40, b: 40, l: 70 },
+      margin: { t: 10, r: 40, b: 40, l: 70 },
       xaxis: {
         gridcolor: '#e5e7eb',
         linecolor: '#d1d5db',

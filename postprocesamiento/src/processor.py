@@ -43,6 +43,7 @@ from .utils import (
 
 
 VERBOSE_PROCESSOR_LOGS = os.environ.get("ANE_VERBOSE_PROCESSOR", "1").lower() not in ("0", "false", "no")
+COMPLIANCE_MIN_RELATIVE_POWER_RATIO = 0.01
 
 
 def _proc_log(message: str) -> None:
@@ -336,6 +337,55 @@ def _safe_power_dbm(value: Any) -> Optional[float]:
     except Exception:
         return None
     return v if np.isfinite(v) else None
+
+
+def _filter_final_candidates_for_compliance(
+    base_emissions: List[Dict[str, Any]],
+    *,
+    min_relative_power_ratio: float = COMPLIANCE_MIN_RELATIVE_POWER_RATIO,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[float]]:
+    """Ignora candidatos muy débiles frente al pico más fuerte antes de cumplimiento.
+
+    La comparación se hace permaneciendo en dBm:
+    si el mínimo relativo deseado es r, entonces el umbral equivalente es
+    max_power_dbm + 10*log10(r).
+    """
+    if len(base_emissions) <= 1:
+        return list(base_emissions), [], None
+
+    max_power_value: Optional[float] = None
+    for base in base_emissions:
+        p_value = _safe_power_dbm(base.get("p_medida_dBm", None))
+        if p_value is not None and np.isfinite(p_value):
+            if max_power_value is None or float(p_value) > float(max_power_value):
+                max_power_value = float(p_value)
+
+    if max_power_value is None:
+        return list(base_emissions), [], None
+
+    try:
+        ratio = float(min_relative_power_ratio)
+    except Exception:
+        ratio = COMPLIANCE_MIN_RELATIVE_POWER_RATIO
+    if (not np.isfinite(ratio)) or ratio <= 0.0:
+        ratio = COMPLIANCE_MIN_RELATIVE_POWER_RATIO
+
+    min_power_delta_db = float(10.0 * np.log10(ratio))
+    min_power_value = float(max_power_value + min_power_delta_db)
+    kept: List[Dict[str, Any]] = []
+    ignored: List[Dict[str, Any]] = []
+
+    for base in base_emissions:
+        p_value = _safe_power_dbm(base.get("p_medida_dBm", None))
+        if p_value is not None and np.isfinite(p_value) and p_value < min_power_value:
+            ignored_row = dict(base)
+            ignored_row["_ignored_pre_compliance_reason"] = "relative_power_below_threshold"
+            ignored_row["_delta_p_vs_max_dB"] = float(p_value - max_power_value)
+            ignored.append(ignored_row)
+            continue
+        kept.append(base)
+
+    return kept, ignored, min_power_value
 
 
 
@@ -1751,9 +1801,9 @@ def _build_processing_args(umbral_db: Optional[float] = None) -> SimpleNamespace
         min_bw_hz=15e3,
 
         # Refinamiento local por steps
-        refine_percentile=50.0,
-        refine_expansion_factor=1.30,
-        refine_height_ratio_limit=0.40,
+        refine_percentile=60.0,
+        refine_expansion_factor=1.15,
+        refine_height_ratio_limit=0.55,
 
         # Parámetros extra que usa build_step_noise_floor y que no estaban
         # visibles en tu main, pero sí existen en la firma de la función
@@ -2084,7 +2134,9 @@ def process_input(
         "detector args "
         f"smooth_window={getattr(args, 'smooth_window', None)} "
         f"smooth_polyorder={getattr(args, 'smooth_polyorder', None)} "
+        f"refine_percentile={getattr(args, 'refine_percentile', None)} "
         f"refine_expansion_factor={getattr(args, 'refine_expansion_factor', None)} "
+        f"refine_height_ratio_limit={getattr(args, 'refine_height_ratio_limit', None)} "
         f"delta_above_nf_db={getattr(args, 'delta_above_nf_db', None)} "
         f"merge_gap_hz={getattr(args, 'merge_gap_hz', None)} "
         f"min_bw_hz={getattr(args, 'min_bw_hz', None)}"
@@ -2275,6 +2327,8 @@ def process_input(
 
         FC_MARGIN_MHZ = fc_margin_mhz
         BW_MARGIN_KHZ = bw_margin_khz
+        out["pre_compliance_relative_power_ratio"] = float(COMPLIANCE_MIN_RELATIVE_POWER_RATIO)
+        out["pre_compliance_relative_power_delta_db"] = float(10.0 * np.log10(COMPLIANCE_MIN_RELATIVE_POWER_RATIO))
 
         base_emissions: List[Dict[str, Any]] = []
         for row in detected_rows:
@@ -2291,6 +2345,19 @@ def process_input(
                 }
             )
         _proc_log(f"base_emissions built count={len(base_emissions)}")
+        base_emissions, ignored_pre_compliance, min_power_value = _filter_final_candidates_for_compliance(
+            base_emissions,
+            min_relative_power_ratio=COMPLIANCE_MIN_RELATIVE_POWER_RATIO,
+        )
+        if min_power_value is not None:
+            out["pre_compliance_min_power_threshold"] = float(min_power_value)
+        if ignored_pre_compliance:
+            out["ignored_candidates_pre_compliance"] = ignored_pre_compliance
+        _proc_log(
+            "pre-compliance relative power filter "
+            f"ratio={COMPLIANCE_MIN_RELATIVE_POWER_RATIO} "
+            f"kept={len(base_emissions)} ignored={len(ignored_pre_compliance)}"
+        )
 
         if len(danes_list) > 1:
             _proc_log("compliance using multi-DANE matching")

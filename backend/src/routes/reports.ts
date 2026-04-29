@@ -29,6 +29,31 @@ interface GeolocationResult {
   };
 }
 
+function parseOptionalUmbral(rawValue: unknown): number | null | undefined {
+  if (rawValue === undefined) return undefined;
+  if (rawValue === null) return null;
+
+  if (typeof rawValue === 'string') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (normalized === '' || normalized === 'null' || normalized === 'undefined') {
+      return null;
+    }
+  }
+
+  const parsed = parseFloat(String(rawValue));
+  if (Number.isNaN(parsed) || parsed < 0) return 0;
+  return parsed;
+}
+
+function getCachedReportUmbral(cachedData: any): number | null | undefined {
+  return cachedData?.analisis_espectral?.umbral_db ?? cachedData?.umbral_db;
+}
+
+function areEquivalentUmbrales(left: number | null | undefined, right: number | null | undefined): boolean {
+  if (left == null || right == null) return left == null && right == null;
+  return Math.abs(left - right) < 0.01;
+}
+
 /**
  * @swagger
  * /api/reports/compliance/{campaignId}:
@@ -60,26 +85,20 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
     const campaignId = parseInt(req.params.campaignId);
     const forceRegenerate = req.query.force === 'true'; // Parámetro opcional para forzar regeneración
     
-    // Obtener umbral del body o query params (default: 5)
-    let requestedUmbral: number | null = null;
-    if (req.body.umbral !== undefined) requestedUmbral = parseFloat(req.body.umbral);
-    else if (req.query.umbral !== undefined) requestedUmbral = parseFloat(req.query.umbral as string);
-    else if (req.body.umbral_db !== undefined) requestedUmbral = parseFloat(req.body.umbral_db);
-    else if (req.query.umbral_db !== undefined) requestedUmbral = parseFloat(req.query.umbral_db as string);
+    // Obtener umbral del body o query params.
+    // Si no llega o llega como null, usamos modo automático y lo enviamos explícitamente como null a Python.
+    let requestedUmbral = parseOptionalUmbral(req.body.umbral);
+    if (requestedUmbral === undefined) requestedUmbral = parseOptionalUmbral(req.query.umbral);
+    if (requestedUmbral === undefined) requestedUmbral = parseOptionalUmbral(req.body.umbral_db);
+    if (requestedUmbral === undefined) requestedUmbral = parseOptionalUmbral(req.query.umbral_db);
 
-    // Validar rango 0-10 si se proporciona
-    if (requestedUmbral !== null) {
-      if (isNaN(requestedUmbral) || requestedUmbral < 0) requestedUmbral = 0;
-      // No limitamos estrictamente a 10 en backend, pero el frontend lo hará.
-      // Python lo maneja como float positivo.
-    }
-
-    const UMBRAL_DB = requestedUmbral !== null ? requestedUmbral : 5;
+    const UMBRAL_DB: number | null = requestedUmbral === undefined ? null : requestedUmbral;
+    const umbralLabel = UMBRAL_DB === null ? 'auto' : `${UMBRAL_DB}dB`;
 
     // 0. Verificar si ya existe un reporte cacheado
-    // NOTA: El cache solo se usa para umbral=5 y sin especificar sensor (por compatibilidad con estructura actual de DB)
+    // NOTA: El cache solo se usa para umbral automático y sin especificar sensor.
     const sensorMacQuery = req.query.sensor_mac as string;
-    const useCache = !forceRegenerate && UMBRAL_DB === 5 && !sensorMacQuery;
+    const useCache = !forceRegenerate && UMBRAL_DB === null && !sensorMacQuery;
     
     if (useCache) {
       const cachedReport = await query(`
@@ -90,14 +109,10 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
 
       if (cachedReport.rows.length > 0) {
         const cachedData = cachedReport.rows[0].report_data;
-        // Verificar si el reporte cacheado tiene el mismo umbral
-        // Si el reporte cacheado no tiene umbral guardado (versiones viejas), asumimos 5.
-        const cachedUmbral = cachedData.umbral_db !== undefined ? cachedData.umbral_db : 5;
+        const cachedUmbral = getCachedReportUmbral(cachedData);
         
-        // Si el umbral solicitado coincide con el cacheado, devolvemos cache
-        // Usamos una pequeña tolerancia para floats
-        if (Math.abs(cachedUmbral - UMBRAL_DB) < 0.01) {
-          console.log(`✅ Returning cached report for campaign ${campaignId} (Umbral: ${cachedUmbral})`);
+        if (areEquivalentUmbrales(cachedUmbral, UMBRAL_DB)) {
+          console.log(`✅ Returning cached report for campaign ${campaignId} (Umbral: ${cachedUmbral ?? 'auto'})`);
           return res.json({
             ...cachedData,
             cached: true,
@@ -105,14 +120,14 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
             cache_updated_at: cachedReport.rows[0].updated_at
           });
         } else {
-          console.log(`⚠️ Cached report has umbral ${cachedUmbral}, requested ${UMBRAL_DB}. Regenerating...`);
+          console.log(`⚠️ Cached report has umbral ${cachedUmbral ?? 'undefined'}, requested ${umbralLabel}. Regenerating...`);
         }
       }
     } else {
-      console.log(`🔄 Cache disabled for this request (umbral=${UMBRAL_DB}, sensor=${sensorMacQuery || 'auto'})`);
+      console.log(`🔄 Cache disabled for this request (umbral=${umbralLabel}, sensor=${sensorMacQuery || 'auto'})`);
     }
 
-    console.log(`🔄 Generating new report for campaign ${campaignId} with umbral ${UMBRAL_DB}dB...`);
+    console.log(`🔄 Generating new report for campaign ${campaignId} with umbral ${umbralLabel}...`);
     
     // 1. Obtener información de la campaña y validar sensor
     let campaignQuery = `
@@ -568,7 +583,7 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
         modo: 'compliance',
         cumplimiento_general: totalEmisionesGlobal > 0 && totalCumplenGlobal === totalEmisionesGlobal,
         emisiones_detectadas: totalEmisionesGlobal,
-        umbral_db: UMBRAL_DB,
+        umbral_db: UMBRAL_DB ?? undefined,
         tolerancia_fc_khz: delta_fc_khz,
         tolerancia_bw_khz: delta_bw_khz,
         correccion_aplicada: false,
@@ -603,7 +618,7 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
 
     console.log(`✅ Report generated. Measurements: ${allMediciones.length}, Total emissions: ${totalEmisionesGlobal}, Compliance: ${porcentajeCumplimientoGlobal}%`);
     
-    // 10. Guardar reporte en caché (solo para umbral=5 sin sensor específico)
+    // 10. Guardar reporte en caché (solo para umbral automático sin sensor específico)
     if (useCache) {
       try {
         await query(`
@@ -620,7 +635,7 @@ router.post('/compliance/:campaignId', async (req: Request, res: Response) => {
         // No fallar si no se puede cachear, solo logear
       }
     } else {
-      console.log(`💾 Cache not saved (custom umbral or specific sensor)`);
+      console.log(`💾 Cache not saved (manual umbral or specific sensor)`);
     }
     
     res.json({
