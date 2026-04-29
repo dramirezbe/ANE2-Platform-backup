@@ -2,8 +2,9 @@ import { memo, useEffect, useRef, useMemo, useState } from 'react';
 import Plotly from 'plotly.js-dist-min';
 
 const WATERFALL_POWER_LABEL = 'units';
-const WATERFALL_MIN_POWER = -80;
+const WATERFALL_MIN_POWER = -75;
 const WATERFALL_MAX_POWER = 5;
+const WATERFALL_NORMALIZATION_EXPONENT = 0.75;
 
 interface WaterfallProps {
   history: { frequency: number; power: number }[][];
@@ -178,15 +179,14 @@ export const Waterfall = memo(function Waterfall({ history, freqUnit = 'MHz', mi
 
     const powerRange = Math.max(WATERFALL_MAX_POWER - WATERFALL_MIN_POWER, 1e-9);
 
-    // Non-linear normalization using square root: amplifies detail in low power range
-    // The 0.5 exponent makes -80 to -30 dBm use ~75% of the color range
+    // Non-linear normalization with a gentler lift for lower-power signals.
+    // Keeping the exponent closer to 1.0 makes the scale less aggressive than a square root.
     const normalizedZData = zData.map(row =>
       row.map(value => {
         if (!Number.isFinite(value)) return Number.NaN;
         
         const linear = Math.max(0, Math.min(1, (value - WATERFALL_MIN_POWER) / powerRange));
-        // The 0.5 exponent (square root) amplifies lower values where most signals are
-        return Math.pow(linear, 0.5) * 100;
+        return Math.pow(linear, WATERFALL_NORMALIZATION_EXPONENT) * 100;
       })
     );
 
