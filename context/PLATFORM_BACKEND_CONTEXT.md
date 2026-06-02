@@ -486,36 +486,6 @@ segundos.
    medida que crezcan en volumen, pueden presentar degradación similar a la
    que motivó la migración desde SQLite.
 
-## Recomendaciones
-
-1. **Réplica de base de datos**: configurar replicación streaming en
-   PostgreSQL para garantizar continuidad operativa ante falla del servidor
-   principal.
-
-2. **Escalamiento horizontal**: evaluar la introducción de un message broker
-   (Redis) como backend de WebSocket para permitir múltiples instancias del
-   servidor coordinadas y balanceo de carga.
-
-3. **Monitoreo del backend**: implementar métricas de salud del servidor
-   (consumo de memoria, latencia de respuesta, conexiones activas, tamaño de
-   pool) con exportación a un sistema de monitoreo institucional.
-
-4. **Compresión y retención en todas las tablas de series temporales**:
-   extender la configuración de TimescaleDB a `sensor_data` y `sensor_gps`
-   para beneficiarse de compresión automática y políticas de retención que
-   eviten el crecimiento indefinido.
-
-5. **Revisión de seguridad en endpoints administrativos**: verificar que
-   todos los endpoints de administración y configuración requieran
-   autenticación y autorización apropiadas, documentando explícitamente qué
-   endpoints son de acceso público (ingesta de sensores) y cuáles requieren
-   sesión validada.
-
-6. **Resiliencia del postprocesamiento**: implementar reintentos con backoff
-   exponencial y un mecanismo de cola de trabajos para solicitudes de reportes
-   cuando el servicio Python de postprocesamiento no esté disponible
-   temporalmente.
-
 ## Repositorio
 
 | Campo | Valor |

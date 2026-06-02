@@ -6,49 +6,7 @@ La vista general es corta a proposito. Para profundizar en cada parte, hay diagr
 
 ## Diagrama general: de la medicion al reporte
 
-```mermaid
-%%{init: {'flowchart': {'curve': 'stepAfter'}}}%%
-flowchart LR
-    %% Clases de colores
-    classDef orange fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#9a3412
-    classDef blue fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e40af
-    classDef green fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#166534
-    classDef purple fill:#faf5ff,stroke:#9333ea,stroke-width:2px,color:#581c87
-    classDef slate fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#1e293b
-
-    PERSONA["<b>Persona usuaria</b><br/>consulta, configura y revisa resultados"]:::slate
-    SENSOR["<b>Sensores RF</b><br/>miden el espectro en campo"]:::slate
-
-    subgraph FRONTEND[" frontend/ "]
-        UI["<b>Interfaz web</b><br/>mapas, monitoreo, campañas,<br/>alertas y reportes"]:::blue
-    end
-
-    subgraph BACKEND[" backend/ "]
-        COORD["<b>Centro de coordinacion</b><br/>usuarios, sensores, datos,<br/>campañas y tiempo real"]:::green
-        DATOS["<b>Base de datos</b><br/>historico, configuracion y resultados"]:::purple
-    end
-
-    subgraph ANALISIS[" postprocesamiento/ "]
-        PY["<b>Analisis normativo</b><br/>detecta emisiones y evalua cumplimiento"]:::orange
-    end
-
-    PERSONA -->|opera la plataforma| UI
-    UI -->|pide informacion o acciones| COORD
-    COORD -->|actualiza pantallas| UI
-
-    COORD -->|configuracion o campañas| SENSOR
-    SENSOR -->|estado, ubicacion, espectro y audio| COORD
-
-    COORD <--> DATOS
-
-    COORD -->|mediciones de campaña| PY
-    PY -->|emisiones detectadas y cumplimiento| COORD
-    COORD -->|reporte listo para interpretar| UI
-
-    style FRONTEND rx:6,ry:6
-    style BACKEND rx:6,ry:6
-    style ANALISIS rx:6,ry:6
-```
+![Diagrama general: de la medicion al reporte](images/GENERAL-diagram.jpeg)
 
 ## Como leer este mapa
 
