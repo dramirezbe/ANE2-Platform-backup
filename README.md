@@ -7,47 +7,47 @@ La vista general es corta a proposito. Para profundizar en cada parte, hay diagr
 ## Diagrama general: de la medicion al reporte
 
 ```mermaid
+%%{init: {'flowchart': {'curve': 'stepAfter'}}}%%
 flowchart LR
-  PERSONA["Persona usuaria<br/>consulta, configura y revisa resultados"]
-  SENSOR["Sensores RF<br/>miden el espectro en campo"]
+    %% Clases de colores
+    classDef orange fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#9a3412
+    classDef blue fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    classDef green fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#166534
+    classDef purple fill:#faf5ff,stroke:#9333ea,stroke-width:2px,color:#581c87
+    classDef slate fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#1e293b
 
-  subgraph FRONTEND["frontend/"]
-    UI["Interfaz web<br/>mapas, monitoreo, campañas,<br/>alertas y reportes"]
-  end
+    PERSONA["<b>Persona usuaria</b><br/>consulta, configura y revisa resultados"]:::slate
+    SENSOR["<b>Sensores RF</b><br/>miden el espectro en campo"]:::slate
 
-  subgraph BACKEND["backend/"]
-    COORD["Centro de coordinacion<br/>usuarios, sensores, datos,<br/>campañas y tiempo real"]
-    DATOS["Base de datos<br/>historico, configuracion y resultados"]
-  end
+    subgraph FRONTEND[" frontend/ "]
+        UI["<b>Interfaz web</b><br/>mapas, monitoreo, campañas,<br/>alertas y reportes"]:::blue
+    end
 
-  subgraph ANALISIS["postprocesamiento/"]
-    PY["Analisis normativo<br/>detecta emisiones y evalua cumplimiento"]
-  end
+    subgraph BACKEND[" backend/ "]
+        COORD["<b>Centro de coordinacion</b><br/>usuarios, sensores, datos,<br/>campañas y tiempo real"]:::green
+        DATOS["<b>Base de datos</b><br/>historico, configuracion y resultados"]:::purple
+    end
 
-  PERSONA -->|opera la plataforma| UI
-  UI -->|pide informacion o acciones| COORD
-  COORD -->|actualiza pantallas| UI
+    subgraph ANALISIS[" postprocesamiento/ "]
+        PY["<b>Analisis normativo</b><br/>detecta emisiones y evalua cumplimiento"]:::orange
+    end
 
-  COORD -->|configuracion o campañas| SENSOR
-  SENSOR -->|estado, ubicacion, espectro y audio| COORD
+    PERSONA -->|opera la plataforma| UI
+    UI -->|pide informacion o acciones| COORD
+    COORD -->|actualiza pantallas| UI
 
-  COORD <--> DATOS
+    COORD -->|configuracion o campañas| SENSOR
+    SENSOR -->|estado, ubicacion, espectro y audio| COORD
 
-  COORD -->|mediciones de campaña| PY
-  PY -->|emisiones detectadas y cumplimiento| COORD
-  COORD -->|reporte listo para interpretar| UI
+    COORD <--> DATOS
 
-  classDef actor fill:#fff,stroke:#111,stroke-width:2px,color:#000;
-  classDef frontend fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px,color:#000;
-  classDef backend fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#000;
-  classDef python fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#000;
-  classDef data fill:#f3e8ff,stroke:#8b5cf6,stroke-width:2px,color:#000;
+    COORD -->|mediciones de campaña| PY
+    PY -->|emisiones detectadas y cumplimiento| COORD
+    COORD -->|reporte listo para interpretar| UI
 
-  class PERSONA,SENSOR actor;
-  class UI frontend;
-  class COORD backend;
-  class DATOS data;
-  class PY python;
+    style FRONTEND rx:6,ry:6
+    style BACKEND rx:6,ry:6
+    style ANALISIS rx:6,ry:6
 ```
 
 ## Como leer este mapa

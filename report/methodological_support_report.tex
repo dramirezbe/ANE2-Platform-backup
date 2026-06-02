@@ -77,39 +77,8 @@
 \clearpage
 \pagenumbering{arabic}
 
-\begin{abstract}
-This report provides a methodological and technical foundation for the current frontend and backend implementation of the ANE spectral sensing platform. The objective is not merely to enumerate files, but to reconstruct the architectural logic that connects user interaction, sensor control, real-time telemetry, campaign orchestration, and compliance reporting. The report is based on triangulated evidence from the repository documentation under \code{context/}, the active source code under \code{frontend/} and \code{backend/}, and the database reconstruction notes contained in \code{context/db/}. The analytical approach follows an evidence-based software architecture documentation method inspired by architectural recovery practice: concerns are identified, code is grouped into functional viewpoints, and design choices are justified according to operational, security, maintainability, and traceability criteria. The resulting document offers a formal problem framing, scope definition, module-to-responsibility mapping, and explicit justifications for strategies, tools, and algorithms. It is therefore suitable as methodological support for technical reporting, onboarding, architectural review, and future refactoring or extension activities.
-\end{abstract}
-
 \tableofcontents
 \newpage
-
-\section{Introduction}
-
-\subsection{Problematic Introduction}
-The platform addressed by this repository solves a non-trivial engineering problem: it must transform heterogeneous radio-frequency measurements produced by geographically distributed sensors into operationally usable information for human operators and administrators. This transformation is difficult for four reasons. First, the physical sensing layer is asynchronous, noisy, and operationally exposed to disconnections, thermal stress, and timing drift. Second, the web platform must support both low-latency monitoring and delayed analytical workflows such as campaign analysis and compliance reporting. Third, the control plane must coordinate field devices, administrative users, and scheduled measurement programs without losing temporal coherence. Fourth, the reporting layer must bridge raw spectral measurements with normative interpretation, which requires contextual enrichment such as geolocation, tolerance handling, and post-processing integration.
-
-Under these conditions, a purely descriptive software inventory would be insufficient. A proper methodological environment requires a report that explains how the codebase operationalizes system responsibilities, how responsibilities are partitioned between frontend and backend, what technical principles justify the selected technologies, and which algorithms or heuristics embody the operational rules of the platform. This report is written to satisfy that need.
-
-\subsection{Purpose}
-The purpose of this document is to provide a comprehensive methodological support report for the frontend and backend layers of \project. The report aims to:
-
-\begin{itemize}
-  \item establish the architectural foundation of the current implementation;
-  \item define the scope and technical role of the principal modules;
-  \item justify the strategies, tools, and algorithms embedded in the code;
-  \item provide a traceable bridge between contextual documentation and implementation evidence; and
-  \item create a reusable academic-style reference for technical governance and future maintenance.
-\end{itemize}
-
-\subsection{Scope and Delimitation}
-The report covers only the web frontend and backend platform layers:
-
-\begin{itemize}
-  \item \textbf{Included}: user authentication, application shell, monitoring interface, campaign management, alerts, configuration, REST services, WebSocket services, persistence, scheduling logic, reporting orchestration, and database structure as it supports the frontend/backend architecture.
-  \item \textbf{Contextually considered but not documented in depth}: \code{postprocesamiento/} and the RF edge-node processing context. These elements were read to understand boundary contracts and operational dependencies, but they are not treated as primary report subjects.
-  \item \textbf{Explicitly ignored}: \code{worksheet-plan/}, in accordance with the task instruction.
-\end{itemize}
 
 \section{Methodological Framework}
 
